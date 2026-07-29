@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小高同学的吃饭选择 - 抽奖大转盘</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --gold: #f0c060;
+            --gold-light: #ffe9b0;
+            --accent: #ff6b6b;
+            --text: #f5f5f5;
+            --text-secondary: #c0c0c0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse at center, #1a1a3e 0%, #0a0a18 70%),
+                radial-gradient(circle at 20% 30%, rgba(255, 107, 107, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(240, 192, 96, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(100, 150, 255, 0.04) 0%, transparent 60%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            overflow-x: hidden;
+            padding: 20px;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            max-width: 750px;
+            width: 100%;
+        }
+
+        /* 标题 */
+        .title-area {
+            text-align: center;
+        }
+        .title {
+            font-size: clamp(1.4rem, 3vw, 2rem);
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 0 0 30px rgba(240, 192, 96, 0.7), 0 0 60px rgba(240, 192, 96, 0.35), 0 2px 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.06em;
+            line-height: 1.3;
+            background: linear-gradient(180deg, #ffe9b0 0%, #f0c060 40%, #c8943e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 2px 6px rgba(200, 150, 50, 0.5));
+        }
+        .subtitle {
+            font-size: 0.85rem;
+            color: #c0a870;
+            letter-spacing: 0.08em;
+            margin-top: 2px;
+        }
+
+        /* 转盘容器 */
+        .wheel-wrapper {
+            position: relative;
+            width: min(700px, 90vw);
+            height: min(700px, 90vw);
+            flex-shrink: 0;
+        }
+
+        /* 光晕背景 */
+        .wheel-glow {
+            position: absolute;
+            inset: -30px;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                    rgba(240, 192, 96, 0.15) 0%,
+                    rgba(240, 150, 60, 0.06) 40%,
+                    rgba(255, 107, 107, 0.03) 65%,
+                    transparent 75%);
+            pointer-events: none;
+            animation: glowPulse 3s ease-in-out infinite;
+            z-index: 0;
+        }
+        @keyframes glowPulse {
+            0%,
+            100% {
+                opacity: 0.7;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.04);
+            }
+        }
+
+        /* 灯泡环 */
+        .bulb-ring {
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+            animation: bulbTwinkle 0.8s steps(1) infinite;
+        }
+        @keyframes bulbTwinkle {
+            0%,
+            100% {
+                filter: brightness(1);
+            }
+            50% {
+                filter: brightness(1.25);
+            }
+        }
+
+        canvas#wheelCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.5));
+            cursor: pointer;
+            transition: filter 0.3s;
+        }
+        canvas#wheelCanvas:hover {
+            filter: drop-shadow(0 10px 40px rgba(240, 192, 96, 0.4));
+        }
+        canvas#wheelCanvas.spinning {
+            cursor: default;
+        }
+
+        /* 指针 */
+        .pointer {
+            position: absolute;
+            top: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            width: 44px;
+            height: 52px;
+            pointer-events: none;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+        }
+        .pointer-inner {
+            width: 0;
+            height: 0;
+            border-left: 22px solid transparent;
+            border-right: 22px solid transparent;
+            border-top: 46px solid #e8453c;
+            position: relative;
+        }
+        .pointer-inner::after {
+            content: '';
+            position: absolute;
+            top: -50px;
+            left: -14px;
+            width: 0;
+            height: 0;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-top: 30px solid #ff5c52;
+        }
+        .pointer-dot {
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #fff, 0 0 20px rgba(255, 255, 255, 0.7);
+            z-index: 2;
+        }
+
+        /* 中心按钮 */
+        .center-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 8;
+            width: min(90px, 13vw);
+            height: min(90px, 13vw);
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #fff 0%, #f5f5f5 30%, #d5d5d5 70%, #b0b0b0 100%);
+            border: 4px solid #c8943e;
+            box-shadow:
+                0 4px 15px rgba(0, 0, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.6),
+                0 0 25px rgba(240, 192, 96, 0.5);
+            cursor: pointer;
+            font-size: min(1.1rem, 2.5vw);
+            font-weight: 800;
+            color: #5a3a1a;
+            letter-spacing: 0.04em;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .center-btn:hover {
+            box-shadow:
+                0 6px 22px rgba(0, 0, 0, 0.5),
+                inset 0 2px 4px rgba(255, 255, 255, 0.6),
+                0 0 40px rgba(240, 192, 96, 0.75);
+            transform: translate(-50%, -50%) scale(1.06);
+        }
+        .center-btn:active {
+            transform: translate(-50%, -50%) scale(0.94);
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.5),
+                inset 0 3px 6px rgba(0, 0, 0, 0.15),
+                0 0 18px rgba(240, 192, 96, 0.4);
+            transition: all 0.08s;
+        }
+        .center-btn.disabled {
+            pointer-events: none;
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        /* 下方控制区 */
+        .control-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 500px;
+        }
+        .btn-spin-bottom {
+            display: none;
+            padding: 14px 40px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #ff6b6b, #e8453c);
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(232, 69, 60, 0.45);
+            transition: all 0.25s;
+        }
+        .btn-spin-bottom:hover {
+            box-shadow: 0 8px 28px rgba(232, 69, 60, 0.65);
+            transform: translateY(-2px);
+        }
+        .btn-spin-bottom:active {
+            transform: scale(0.95);
+            box-shadow: 0 3px 10px rgba(232, 69, 60, 0.4);
+        }
+        .btn-spin-bottom:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        @media (max-width: 600px) {
+            .btn-spin-bottom {
+                display: inline-block;
+            }
+            .center-btn {
+                font-size: 0.7rem;
+                width: 58px;
+                height: 58px;
+                border-width: 3px;
+            }
+            .pointer {
+                width: 30px;
+                height: 36px;
+                top: -12px;
+            }
+            .pointer-inner {
+                border-left-width: 15px;
+                border-right-width: 15px;
+                border-top-width: 32px;
+            }
+            .pointer-inner::after {
+                top: -36px;
+                left: -10px;
+                border-left-width: 10px;
+                border-right-width: 10px;
+                border-top-width: 22px;
+            }
+            .pointer-dot {
+                width: 8px;
+                height: 8px;
+                top: -3px;
+            }
+        }
+
+        /* 结果展示卡片 */
+        .result-card {
+            background: var(--card-bg);
+            border: 2px solid rgba(240, 192, 96, 0.4);
+            border-radius: 20px;
+            padding: 18px 28px;
+            text-align: center;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            min-width: 240px;
+            max-width: 95%;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: translateY(20px) scale(0.9);
+            pointer-events: none;
+        }
+        .result-card.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        .result-label {
+            font-size: 0.8rem;
+            color: #c0a870;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+        .result-food {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #ffe9b0;
+            text-shadow: 0 0 20px rgba(240, 192, 96, 0.5);
+            line-height: 1.4;
+            word-break: break-all;
+        }
+        .result-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 6px;
+            animation: bounceIn 0.5s ease-out;
+        }
+        @keyframes bounceIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.25);
+            }
+            70% {
+                transform: scale(0.9);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* 粒子庆祝 */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            animation: confettiFall 1.6s ease-out forwards;
+        }
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-120px) rotate(0deg) scale(1);
+                opacity: 1;
+            }
+            70% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(105vh) rotate(720deg) scale(0.3);
+                opacity: 0;
+            }
+        }
+
+        /* 响应式 */
+        @media (max-width: 480px) {
+            .wheel-wrapper {
+                width: 92vw;
+                height: 92vw;
+            }
+            .result-food {
+                font-size: 1.2rem;
+            }
+            .title {
+                font-size: 1.2rem;
+            }
+            .subtitle {
+                font-size: 0.7rem;
+            }
+            .result-card {
+                padding: 14px 18px;
+                border-radius: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- 标题 -->
+        <div class="title-area">
+            <h1 class="title">🎯 小高同学的吃饭选择</h1>
+            <p class="subtitle">✨ 100种美味 · 今天吃什么？让命运来决定！</p>
+        </div>
+
+        <!-- 转盘 -->
+        <div class="wheel-wrapper" id="wheelWrapper">
+            <div class="wheel-glow"></div>
+            <canvas id="wheelCanvas" width="700" height="700"></canvas>
+            <!-- 指针 -->
+            <div class="pointer">
+                <div class="pointer-inner"></div>
+                <div class="pointer-dot"></div>
+            </div>
+            <!-- 中心按钮 -->
+            <button class="center-btn" id="centerBtn" title="点击旋转转盘">转</button>
+        </div>
+
+        <!-- 结果卡片 -->
+        <div class="result-card" id="resultCard">
+            <div class="result-emoji" id="resultEmoji">🍽️</div>
+            <div class="result-label">🎉 今天午饭就吃：</div>
+            <div class="result-food" id="resultFood">点击转盘开始抽选</div>
+        </div>
+
+        <!-- 移动端底部按钮 -->
+        <button class="btn-spin-bottom" id="btnSpinBottom">🎰 开始旋转</button>
+    </div>
+
+    <!-- 彩纸容器 -->
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <script>
+        (function() {
+            // ============ 100种食物 ============
+            const foods = [
+                '黄焖鸡米饭', '红烧牛肉面', '番茄鸡蛋盖饭', '鱼香肉丝盖饭', '宫保鸡丁盖饭',
+                '麻辣烫（自选配菜）', '重庆小面', '兰州拉面', '老北京炸酱面', '武汉热干面',
+                '柳州螺蛳粉', '重庆酸辣粉', '过桥米线', '沙县扁肉拌面', '黄焖排骨饭',
+                '照烧鸡腿饭', '咖喱鸡排饭', '寿司拼盘套餐', '鳗鱼饭', '豚骨拉面',
+                '韩式炸鸡配年糕', '石锅拌饭', '部队火锅面', '越南牛肉河粉', '泰式冬阴功面',
+                '意式腊肠披萨', '汉堡薯条套餐', '意大利肉酱面', '凯撒沙拉配鸡胸', '俱乐部三明治套餐',
+                '卤肉饭', '蜜汁叉烧饭', '港式烧鸭饭', '白切鸡饭', '叉烧拼烧鸭饭',
+                '水煮鱼配米饭', '酸菜鱼配米饭', '毛血旺配米饭', '回锅肉盖饭', '麻婆豆腐盖饭',
+                '糖醋里脊盖饭', '京酱肉丝盖饭', '地三鲜盖饭', '干煸四季豆盖饭', '红烧肉盖饭',
+                '梅菜扣肉饭', '粉蒸肉饭', '口水鸡配米饭', '蒜泥白肉配米饭', '夫妻肺片配米饭',
+                '担担面', '宜宾燃面', '葱油拌面', '油泼面', '岐山臊子面',
+                '羊肉泡馍', '肉夹馍配凉皮', '煎饼果子', '鸡蛋灌饼', '手抓饼配烤肠',
+                '生煎包配粉丝汤', '小笼包配馄饨', '蒸饺配紫菜汤', '锅贴配酸辣汤', '韭菜盒子配小米粥',
+                '腊味煲仔饭', '皮蛋瘦肉粥配油条', '肠粉配豆浆', '糯米鸡', '蛋黄肉粽',
+                '干炒牛河', '炒米粉', '蛋炒饭', '扬州炒饭', '菠萝炒饭',
+                '芝士焗饭', '牛肉丼饭', '亲子丼饭', '天妇罗盖饭', '日式咖喱饭',
+                '韩式泡菜炒饭', '芝士年糕拉面', '炸猪排咖喱饭', '牛油果拌饭', '波奇饭',
+                '轻食沙拉碗', '墨西哥鸡肉卷', '塔可套餐', '烤鱼配米饭', '小龙虾盖饭',
+                '牛蛙煲配米饭', '花甲粉', '锡纸花甲米线', '冒菜配米饭', '麻辣香锅配饭',
+                '串串香配米饭', '烤冷面', '芝士火鸡面', '番茄牛腩面', '铁板牛肉饭'
+            ];
+
+            // 食物对应的emoji（部分匹配）
+            const foodEmojis = [
+                '🍗', '🍜', '🍅', '🥘', '🍗', '🥘', '🍜', '🍜', '🍜', '🍜',
+                '🍜', '🍜', '🍜', '🥟', '🍖', '🍗', '🍛', '🍣', '🍱', '🍜',
+                '🍗', '🍲', '🍲', '🍜', '🍜', '🍕', '🍔', '🍝', '🥗', '🥪',
+                '🍚', '🍖', '🦆', '🍗', '🍖', '🐟', '🐟', '🥘', '🥘', '🌶️',
+                '🍖', '🥘', '🥬', '🫘', '🍖', '🍖', '🍖', '🍗', '🥩', '🌶️',
+                '🍜', '🍜', '🍜', '🍜', '🍜', '🍲', '🥙', '🥞', '🥚', '🌯',
+                '🥟', '🥟', '🥟', '🥟', '🥟', '🍲', '🥣', '🍜', '🍗', '🍙',
+                '🍜', '🍜', '🍚', '🍚', '🍍', '🧀', '🍚', '🍚', '🍤', '🍛',
+                '🍚', '🧀', '🍖', '🥑', '🥗', '🥗', '🌯', '🌮', '🐟', '🦞',
+                '🐸', '🦪', '🦪', '🥘', '🥘', '🍢', '🌯', '🧀', '🍅', '🥩'
+            ];
+
+            // ============ DOM元素 ============
+            const canvas = document.getElementById('wheelCanvas');
+            const ctx = canvas.getContext('2d');
+            const centerBtn = document.getElementById('centerBtn');
+            const btnSpinBottom = document.getElementById('btnSpinBottom');
+            const resultCard = document.getElementById('resultCard');
+            const resultFood = document.getElementById('resultFood');
+            const resultEmoji = document.getElementById('resultEmoji');
+            const confettiContainer = document.getElementById('confettiContainer');
+            const wheelWrapper = document.getElementById('wheelWrapper');
+
+            const W = canvas.width; // 700
+            const H = canvas.height; // 700
+            const cx = W / 2;
+            const cy = H / 2;
+            const outerRadius = 325; // 转盘外半径
+            const innerRadius = 55; // 转盘内半径（文字起始）
+            const textStartRadius = 72; // 文字起始半径
+            const textEndRadius = 300; // 文字结束半径
+            const numSectors = 100;
+            const sectorAngle = (2 * Math.PI) / numSectors; // 每个扇区弧度
+
+            // ============ 颜色方案：使用黄金角度分布色相 ============
+            function getSectorColor(index) {
+                const hue = (index * 137.508) % 360; // 黄金角度
+                const saturation = 68;
+                const lightness = index % 2 === 0 ? 54 : 48;
+                return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+            }
+
+            function getSectorColorLight(index) {
+                const hue = (index * 137.508) % 360;
+                const saturation = 65;
+                const lightness = index % 2 === 0 ? 58 : 52;
+                return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+            }
+
+            // ============ 状态 ============
+            let currentRotation = 0; // 当前旋转角度（弧度）
+            let isSpinning = false;
+            let animationId = null;
+
+            // ============ 绘制函数 ============
+            function drawWheel(rotation) {
+                ctx.clearRect(0, 0, W, H);
+
+                // --- 外圈阴影环 ---
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, outerRadius + 12, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.fill();
+                ctx.restore();
+
+                // --- 外圈金色装饰环 ---
+                ctx.save();
+                const goldGrad = ctx.createRadialGradient(cx, cy, outerRadius - 2, cx, cy, outerRadius + 10);
+                goldGrad.addColorStop(0, '#c8943e');
+                goldGrad.addColorStop(0.35, '#f0d878');
+                goldGrad.addColorStop(0.6, '#b8782e');
+                goldGrad.addColorStop(1, '#8a5a20');
+                ctx.beginPath();
+                ctx.arc(cx, cy, outerRadius + 8, 0, Math.PI * 2);
+                ctx.fillStyle = goldGrad;
+                ctx.fill();
+                ctx.restore();
+
+                // --- 外圈灯泡槽 ---
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, outerRadius + 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#3a2a10';
+                ctx.fill();
+                ctx.restore();
+
+                // --- 绘制灯泡 ---
+                const numBulbs = 80;
+                for (let i = 0; i < numBulbs; i++) {
+                    const angle = (i / numBulbs) * Math.PI * 2 - Math.PI / 2;
+                    const bx = cx + (outerRadius + 4) * Math.cos(angle);
+                    const by = cy + (outerRadius + 4) * Math.sin(angle);
+                    const bulbOn = (i + Math.floor(Date.now() / 350)) % 3 !== 0;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 3.5, 0, Math.PI * 2);
+                    if (bulbOn) {
+                        ctx.fillStyle = '#ffe9b0';
+                        ctx.shadowColor = '#ffe9b0';
+                        ctx.shadowBlur = 8;
+                    } else {
+                        ctx.fillStyle = '#8a7030';
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // --- 转盘主体圆 ---
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fill();
+                ctx.clip();
+
+                // --- 绘制100个扇区 ---
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(rotation);
+
+                for (let i = 0; i < numSectors; i++) {
+                    const startAngle = i * sectorAngle;
+                    const endAngle = (i + 1) * sectorAngle;
+
+                    // 扇区填充
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, 0, outerRadius, startAngle, endAngle);
+                    ctx.closePath();
+                    ctx.fillStyle = getSectorColor(i);
+                    ctx.fill();
+
+                    // 扇区细边线
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, 0, outerRadius, startAngle, endAngle);
+                    ctx.closePath();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+                    ctx.lineWidth = 0.4;
+                    ctx.stroke();
+                }
+
+                // --- 绘制径向文字 ---
+                for (let i = 0; i < numSectors; i++) {
+                    const midAngle = (i + 0.5) * sectorAngle;
+                    ctx.save();
+                    ctx.rotate(midAngle);
+
+                    // 文字颜色：根据扇区亮度选择
+                    const bgColor = getSectorColorLight(i);
+                    // 提取亮度判断
+                    const isLight = i % 2 === 0;
+                    ctx.fillStyle = isLight ? '#1a1a1a' : '#ffffff';
+                    ctx.font = 'bold 6.8px "PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+
+                    // 文字沿径向排列
+                    const foodName = foods[i];
+                    const maxTextLen = textEndRadius - textStartRadius;
+                    // 测量文字宽度
+                    const textMetrics = ctx.measureText(foodName);
+                    let displayName = foodName;
+                    if (textMetrics.width > maxTextLen && foodName.length > 3) {
+                        // 截断处理
+                        let truncated = '';
+                        for (let ch = 0; ch < foodName.length; ch++) {
+                            if (ctx.measureText(truncated + foodName[ch] + '…').width > maxTextLen) {
+                                truncated += '…';
+                                break;
+                            }
+                            truncated += foodName[ch];
+                        }
+                        displayName = truncated;
+                    }
+
+                    // 添加轻微文字阴影提升可读性
+                    ctx.fillStyle = isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.9)';
+                    ctx.fillText(displayName, textStartRadius, 0);
+
+                    // 如果文字被截断且扇区足够宽，可以考虑不添加额外效果
+                    ctx.restore();
+                }
+
+                ctx.restore(); // 恢复旋转
+
+                // --- 内圈装饰环 ---
+                ctx.beginPath();
+                ctx.arc(cx, cy, innerRadius + 3, 0, Math.PI * 2);
+                const innerRingGrad = ctx.createRadialGradient(cx, cy, innerRadius - 2, cx, cy, innerRadius + 8);
+                innerRingGrad.addColorStop(0, '#e8d5a0');
+                innerRingGrad.addColorStop(0.5, '#c8943e');
+                innerRingGrad.addColorStop(1, '#8a5a20');
+                ctx.fillStyle = innerRingGrad;
+                ctx.fill();
+
+                // --- 内圈深色底 ---
+                ctx.beginPath();
+                ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fill();
+
+                // --- 内圈装饰纹理 ---
+                for (let i = 0; i < 36; i++) {
+                    const a = (i / 36) * Math.PI * 2;
+                    const x1 = cx + (innerRadius - 2) * Math.cos(a);
+                    const y1 = cy + (innerRadius - 2) * Math.sin(a);
+                    const x2 = cx + (innerRadius + 2) * Math.cos(a);
+                    const y2 = cy + (innerRadius + 2) * Math.sin(a);
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = i % 2 === 0 ? '#f0d878' : '#8a5a20';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+
+                ctx.restore(); // 恢复clip
+            }
+
+            // ============ 初始绘制 ============
+            drawWheel(currentRotation);
+
+            // ============ 旋转逻辑 ============
+            function getSelectedFoodIndex(rotation) {
+                // 指针在顶部（12点钟方向），即Canvas角度-π/2（即3π/2或270°）
+                // 在标准坐标中，指针角度为-90°即270°
+                // 转盘旋转了rotation弧度
+                // 指针相对于转盘的角度
+                let pointerAngle = (3 * Math.PI / 2 - rotation) % (Math.PI * 2);
+                if (pointerAngle < 0) pointerAngle += Math.PI * 2;
+                // 扇区0从角度0开始
+                const index = Math.floor(pointerAngle / sectorAngle);
+                return Math.min(index, numSectors - 1);
+            }
+
+            function spinWheel() {
+                if (isSpinning) return;
+                isSpinning = true;
+                centerBtn.classList.add('disabled');
+                btnSpinBottom.disabled = true;
+                canvas.classList.add('spinning');
+                resultCard.classList.remove('visible');
+
+                // 随机旋转角度：5到8圈 + 随机偏移
+                const extraRevolutions = 5 + Math.random() * 3; // 5-8圈
+                const randomOffset = Math.random() * Math.PI * 2;
+                const totalDelta = extraRevolutions * Math.PI * 2 + randomOffset;
+                const startRotation = currentRotation;
+                const targetRotation = startRotation + totalDelta;
+
+                const duration = 3800 + Math.random() * 1800; // 3.8-5.6秒
+                const startTime = performance.now();
+
+                function animate(now) {
+                    const elapsed = now - startTime;
+                    const progress = Math.min(elapsed / duration, 1.0);
+
+                    // 缓出函数：模拟转盘减速
+                    // 使用自定义缓动：开始快，结束时缓慢
+                    const eased = 1 - Math.pow(1 - progress, 3.5);
+
+                    currentRotation = startRotation + totalDelta * eased;
+                    drawWheel(currentRotation);
+
+                    if (progress < 1.0) {
+                        animationId = requestAnimationFrame(animate);
+                    } else {
+                        // 旋转结束
+                        currentRotation = targetRotation % (Math.PI * 2);
+                        if (currentRotation < 0) currentRotation += Math.PI * 2;
+                        drawWheel(currentRotation);
+                        onSpinComplete();
+                    }
+                }
+
+                animationId = requestAnimationFrame(animate);
+            }
+
+            function onSpinComplete() {
+                isSpinning = false;
+                centerBtn.classList.remove('disabled');
+                btnSpinBottom.disabled = false;
+                canvas.classList.remove('spinning');
+                animationId = null;
+
+                const selectedIndex = getSelectedFoodIndex(currentRotation);
+                const foodName = foods[selectedIndex];
+                const emoji = foodEmojis[selectedIndex] || '🍽️';
+
+                // 显示结果
+                resultEmoji.textContent = emoji;
+                resultFood.textContent = foodName;
+                resultCard.classList.add('visible');
+
+                // 触发彩纸效果
+                spawnConfetti();
+
+                // 滚动结果卡片到视图
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // ============ 彩纸效果 ============
+            function spawnConfetti() {
+                const colors = [
+                    '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff8e53',
+                    '#9b59b6', '#48c9b0', '#ff6b8a', '#f0c060', '#5dade2',
+                    '#ff4757', '#ffa502', '#7bed9f', '#70a1ff', '#eccc68'
+                ];
+                const pieces = [];
+                const count = 55;
+
+                for (let i = 0; i < count; i++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'confetti-piece';
+                    piece.style.left = Math.random() * 100 + '%';
+                    piece.style.top = -(Math.random() * 60 + 10) + 'px';
+                    piece.style.width = (Math.random() * 10 + 6) + 'px';
+                    piece.style.height = (Math.random() * 10 + 6) + 'px';
+                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.animationDuration = (Math.random() * 1.4 + 1.2) + 's';
+                    piece.style.animationDelay = Math.random() * 0.5 + 's';
+                    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                    confettiContainer.appendChild(piece);
+                    pieces.push(piece);
+                }
+
+                // 清理
+                setTimeout(() => {
+                    pieces.forEach(p => p.remove());
+                }, 2500);
+            }
+
+            // ============ 事件绑定 ============
+            centerBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!isSpinning) spinWheel();
+            });
+
+            btnSpinBottom.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!isSpinning) spinWheel();
+            });
+
+            // 也支持点击转盘外圈区域旋转
+            canvas.addEventListener('click', (e) => {
+                if (isSpinning) return;
+                // 判断点击是否在转盘主体区域
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = W / rect.width;
+                const scaleY = H / rect.height;
+                const mx = (e.clientX - rect.left) * scaleX;
+                const my = (e.clientY - rect.top) * scaleY;
+                const dist = Math.sqrt((mx - cx) ** 2 + (my - cy) ** 2);
+                // 点击在转盘主体区域（外圈内、中心按钮外）
+                if (dist < outerRadius && dist > innerRadius + 15) {
+                    spinWheel();
+                }
+            });
+
+            // 键盘空格键触发
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && !isSpinning) {
+                    e.preventDefault();
+                    spinWheel();
+                }
+            });
+
+            // ============ 灯泡动画循环（独立于旋转） ============
+            let bulbAnimId;
+            function bulbLoop() {
+                if (!isSpinning && animationId === null) {
+                    // 仅在静止时更新灯泡（旋转时有自己的重绘）
+                    drawWheel(currentRotation);
+                }
+                bulbAnimId = requestAnimationFrame(() => {
+                    bulbLoop();
+                });
+            }
+            // 使用较慢的灯泡更新
+            let lastBulbUpdate = 0;
+
+            function slowBulbLoop(timestamp) {
+                if (!lastBulbUpdate || timestamp - lastBulbUpdate > 400) {
+                    if (!isSpinning && animationId === null) {
+                        drawWheel(currentRotation);
+                    }
+                    lastBulbUpdate = timestamp;
+                }
+                requestAnimationFrame(slowBulbLoop);
+            }
+            requestAnimationFrame(slowBulbLoop);
+
+            // ============ 初始显示结果卡片 ============
+            setTimeout(() => {
+                resultCard.classList.add('visible');
+                resultFood.textContent = '点击转盘中心按钮';
+                resultEmoji.textContent = '🎯';
+            }, 600);
+
+            // ============ 响应式调整 ============
+            function handleResize() {
+                // Canvas的CSS尺寸由CSS处理，这里不需要额外操作
+                // 但可以调整一些视觉元素
+                const wrapperWidth = wheelWrapper.clientWidth;
+                if (wrapperWidth < 400) {
+                    centerBtn.style.fontSize = '0.65rem';
+                } else {
+                    centerBtn.style.fontSize = '';
+                }
+            }
+            window.addEventListener('resize', handleResize);
+            handleResize();
+
+            console.log('🎯 小高同学的吃饭选择 - 抽奖大转盘已就绪！');
+            console.log('   🍽️ 100种美食等待命运的选择...');
+            console.log('   💡 点击转盘中心按钮或按空格键开始抽选');
+            console.log('   📱 支持桌面端和移动端');
+        })();
+    </script>
+</body>
+</html>
